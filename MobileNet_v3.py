@@ -1,8 +1,54 @@
 import torch
 import torch.nn as nn
 import config
+from collections import namedtuple
 from importlib import reload
 config = reload(config)
+
+BNeck = namedtuple('bneck', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
+Conv = namedtuple('conv', ('in_c', 'out_c', 'k', 'bn', 'se', 'nl', 's'))
+Pool = namedtuple('pool', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
+LARGE_PARAMS = (
+    Conv(1, 16, 3, True, False, 'HS', 2),   # 224
+    BNeck(16, 16, 16, 3, False, 'RE', 1),  # 112
+    BNeck(16, 64, 24, 3, False, 'RE', 2),  # 112
+    BNeck(24, 72, 24, 3, False, 'RE', 1),  # 56
+    BNeck(24, 72, 40, 5, True, 'RE', 2),  # 56
+    BNeck(40, 120, 40, 5, True, 'RE', 1),  # 28
+    BNeck(40, 120, 40, 5, True, 'RE', 1),  # 28
+    BNeck(40, 240, 80, 3, False, 'HS', 2),  # 28
+    BNeck(80, 200, 80, 3, False, 'HS', 1),  # 14
+    BNeck(80, 184, 80, 3, False, 'HS', 1),  # 14
+    BNeck(80, 184, 80, 3, False, 'HS', 1),  # 14
+    BNeck(80, 480, 112, 3, True, 'HS', 1),  # 14
+    BNeck(112, 672, 112, 3, True, 'HS', 1),  # 14
+    BNeck(112, 672, 160, 5, True, 'HS', 2),  # 14
+    BNeck(160, 960, 160, 5, True, 'HS', 1),  # 7
+    BNeck(160, 960, 160, 5, True, 'HS', 1),  # 7
+    Conv(160, 960, 1, True, False, 'HS', 1),  # 7
+    Pool(960, '-', '-', '-', False, '-', 1),  # 7
+    Conv(960, 1280, 1, False, False, 'HS', 1),  # 1
+    Conv(1280, config.CLASSES, 1, False, False, '-', 1),  # 1
+)
+
+SMALL_PARAMS = (
+    Conv(1, 16, 3, True, False, 'HS', 2),   # 224
+    BNeck(16, 16, 16, 3, True, 'RE', 2),  # 112
+    BNeck(16, 72, 24, 3, False, 'RE', 2),  # 56
+    BNeck(24, 88, 24, 3, False, 'RE', 1),  # 28
+    BNeck(24, 96, 40, 5, True, 'HS', 2),  # 28
+    BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
+    BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
+    BNeck(40, 120, 48, 5, True, 'HS', 2),  # 14
+    BNeck(48, 144, 48, 5, True, 'HS', 1),  # 14
+    BNeck(48, 288, 96, 5, True, 'HS', 1),  # 14
+    BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
+    BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
+    Conv(96, 576, 1, True, True, 'HS', 1),  # 7
+    Pool(576, '-', '-', '-', False, '-', 1),  # 7
+    Conv(576, 1024, 1, True, False, 'HS', 1),  # 1
+    Conv(1024, config.CLASSES, 1, True, False, '-', 1),  # 1
+)
 
 
 class BaseLayer(nn.Module):
@@ -47,11 +93,12 @@ class DepthWiseConv(BaseLayer):
 
         self.non_linear = self.choice_nl(nl)
         self.normalization = nn.BatchNorm2d(channels)
+        self.dropout = nn.Dropout(config.DROPOUT)
 
     def forward(self, inputs):
         out = []
         for channel, layer in enumerate(self.depth_wise):
-            out.append(layer(inputs[:, [channel]]))
+            out.append(self.dropout(layer(inputs[:, [channel]])))
         return self.non_linear(self.normalization(torch.cat(out, dim=1)))
 
 
@@ -61,18 +108,17 @@ class DepthWiseSepConv(nn.Module):
         self.se = se
         # add squeeze and excite
         if self.se:
-            self.sae = SqueezeAndExcide(in_c, out_c)
+            self.sae = SqueezeAndExcide(in_c, in_c)
         self.depth_wise_conv = DepthWiseConv(in_c, s, k, nl)
         self.point_wise = nn.Conv2d(in_c, out_c, 1)
-        self.normalization = nn.BatchNorm2d(out_c)
 
     def forward(self, inputs):
-        dw_out = self.depth_wise_conv(inputs)
-        out = self.point_wise(dw_out)
+        out = self.depth_wise_conv(inputs)
         if self.se:
-            out *= self.sae(dw_out)
+            out *= self.sae(out)
+        out = self.point_wise(out)
 
-        return self.normalization(out)
+        return out
 
 
 class BottleNeck(BaseLayer):
@@ -81,13 +127,14 @@ class BottleNeck(BaseLayer):
         self.non_linear = self.choice_nl(nl)
         self.conv = nn.Conv2d(in_c, exp_c, 1)
         self.depth_wise_sep = DepthWiseSepConv(exp_c, out_c, s, k, nl, se)
-        self.normalization = nn.BatchNorm2d(exp_c)
+        self.normalization_bn = nn.BatchNorm2d(exp_c)
+        self.normalization_out = nn.BatchNorm2d(out_c)
 
     def forward(self, inputs):
-        out = self.non_linear(self.normalization(self.conv(inputs)))
+        out = self.non_linear(self.normalization_bn(self.conv(inputs)))
         out = self.depth_wise_sep(out)
-
-        return out + inputs if inputs.size == out.size else out
+        out = out + inputs if inputs.size == out.size else out
+        return self.normalization_out(out)
 
 
 class Conv(BaseLayer):
@@ -97,7 +144,7 @@ class Conv(BaseLayer):
         self.bn = bn
 
         if self.se:
-            self.sae = SqueezeAndExcide(in_c, out_c)
+            self.sae = SqueezeAndExcide(out_c, out_c)
         if self.bn:
             self.normalization = nn.BatchNorm2d(out_c)
 
@@ -115,9 +162,15 @@ class Conv(BaseLayer):
         return out
 
 
-def get_model():
+def get_model(size='small'):
+
+    if size == 'large':
+        parameters = config.LARGE_PARAMS
+    else:
+        parameters = config.SMALL_PARAMS
+
     model = nn.Sequential()
-    for ind, param in enumerate(config.LARGE_PARAMS):
+    for ind, param in enumerate(parameters):
         layer_name = type(param).__name__
         if layer_name == 'conv':
             model.add_module(f'{ind} {layer_name}', Conv(*param))
