@@ -1,9 +1,46 @@
 import torch
+import torch.nn as nn
 from tqdm import tqdm
 from copy import deepcopy
 import numpy as np
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
+def train_test_split(data, train_size, stratify=None):
+    if stratify is None:
+        indices = np.arange(len(data))
+        np.random.shuffle(indices)
+        split_index = int(len(indices) * train_size)
+        train_indices, test_indices = indices[:split_index], indices[split_index:]
+        return data[train_indices], data[test_indices]
+    else:
+        unique_values = np.unique(stratify)
+        train_data = []
+        test_data = []
+        for u_value in unique_values:
+            u_train, u_test = train_test_split(data[stratify == u_value], train_size)
+            train_data.append(u_train)
+            test_data.append(u_test)
+        np.random.shuffle(train_data)
+        np.random.shuffle(test_data)
+        return np.concatenate(train_data), np.concatenate(test_data)
+
+
+class EMA(nn.Module):
+    def __init__(self, mu):
+        super(EMA, self).__init__()
+        self.mu = mu
+        self.shadow = {}
+
+    def register(self, name, val):
+        self.shadow[name] = val.clone()
+
+    def forward(self, name, x):
+        assert name in self.shadow
+        new_average = self.mu * x + (1.0 - self.mu) * self.shadow[name]
+        self.shadow[name] = new_average.clone()
+        return new_average
 
 
 class MyDataLoader:
@@ -23,14 +60,17 @@ class MyDataLoader:
         return self.len_
 
     def create_batch(self, indices):
-        batch = []
+        X_batch = []
+        y_batch = []
         for index in indices:
-            batch.append(self.data[index][0])
-        if len(batch) > 1:
-            batch = torch.stack(batch)
+            X, y = self.data[index]
+            X_batch.append(X)
+            y_batch.append(y)
+        if len(X_batch) > 1:
+            X_batch = torch.stack(X_batch)
         else:
-            batch = torch.unsqueeze(batch[0], 0)
-        return batch
+            X_batch = torch.unsqueeze(X_batch[0], 0)
+        return X_batch, y_batch
 
     def __iter__(self):
         if self.shuffle:
@@ -39,10 +79,7 @@ class MyDataLoader:
             start_index = n_batch * self.batch_size
             end_index = min(self.data_len, start_index + self.batch_size)
             batch_indices = self.indices[start_index: end_index]
-            X_batch, y_batch = self.create_batch(batch_indices), \
-                               self.data.targets[batch_indices]
-            if len(X_batch.size()) == 3:
-                X_batch = X_batch.unsqueeze(dim=1)
+            X_batch, y_batch = self.create_batch(batch_indices)
             yield X_batch, y_batch
 
 
@@ -66,6 +103,10 @@ def do_epoch(model, optimizer, loss_func, data_loader,
     # History
     epoch_loss = 0.
     epoch_metric = 0.
+    ema = EMA(0.999)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            ema.register(name, param.data)
 
     with tqdm(total=len(data_loader)) as progress_bar:
         for ind, (X, y) in enumerate(data_loader, 1):
@@ -85,6 +126,9 @@ def do_epoch(model, optimizer, loss_func, data_loader,
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
+                        param.data = ema(name, param.data)
             #  metric calculate
             if metric is not None:
                 epoch_metric += metric(predict, y_tens)
