@@ -9,7 +9,7 @@ BNeck = namedtuple('bneck', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
 Conv = namedtuple('conv', ('in_c', 'out_c', 'k', 'bn', 'se', 'nl', 's'))
 Pool = namedtuple('pool', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
 LARGE_PARAMS = (
-    Conv(1, 16, 3, True, False, 'HS', 2),   # 224
+    Conv(3, 16, 3, True, False, 'HS', 2),   # 224
     BNeck(16, 16, 16, 3, False, 'RE', 1),  # 112
     BNeck(16, 64, 24, 3, False, 'RE', 2),  # 112
     BNeck(24, 72, 24, 3, False, 'RE', 1),  # 56
@@ -32,7 +32,7 @@ LARGE_PARAMS = (
 )
 
 SMALL_PARAMS = (
-    Conv(1, 16, 3, True, False, 'HS', 2),   # 224
+    Conv(3, 16, 3, True, False, 'HS', 2),   # 224
     BNeck(16, 16, 16, 3, True, 'RE', 2),  # 112
     BNeck(16, 72, 24, 3, False, 'RE', 2),  # 56
     BNeck(24, 88, 24, 3, False, 'RE', 1),  # 28
@@ -92,7 +92,7 @@ class DepthWiseConv(BaseLayer):
             )
 
         self.non_linear = self.choice_nl(nl)
-        self.normalization = nn.BatchNorm2d(channels)
+        self.normalization = nn.BatchNorm2d(channels, momentum=config.BN_MOMENTUM)
         self.dropout = nn.Dropout(config.DROPOUT)
 
     def forward(self, inputs):
@@ -127,8 +127,8 @@ class BottleNeck(BaseLayer):
         self.non_linear = self.choice_nl(nl)
         self.conv = nn.Conv2d(in_c, exp_c, 1)
         self.depth_wise_sep = DepthWiseSepConv(exp_c, out_c, s, k, nl, se)
-        self.normalization_bn = nn.BatchNorm2d(exp_c)
-        self.normalization_out = nn.BatchNorm2d(out_c)
+        self.normalization_bn = nn.BatchNorm2d(exp_c, momentum=config.BN_MOMENTUM)
+        self.normalization_out = nn.BatchNorm2d(out_c, momentum=config.BN_MOMENTUM)
 
     def forward(self, inputs):
         out = self.non_linear(self.normalization_bn(self.conv(inputs)))
@@ -146,7 +146,7 @@ class Conv(BaseLayer):
         if self.se:
             self.sae = SqueezeAndExcide(out_c, out_c)
         if self.bn:
-            self.normalization = nn.BatchNorm2d(out_c)
+            self.normalization = nn.BatchNorm2d(out_c, momentum=config.BN_MOMENTUM)
 
         self.conv = nn.Conv2d(in_c, out_c, k, s, self.same_padding(k))
         self.non_linear = self.choice_nl(nl)
@@ -165,15 +165,16 @@ class Conv(BaseLayer):
 def get_model(size='small'):
 
     if size == 'large':
-        parameters = config.LARGE_PARAMS
+        parameters = LARGE_PARAMS
     else:
-        parameters = config.SMALL_PARAMS
+        parameters = SMALL_PARAMS
 
     model = nn.Sequential()
     for ind, param in enumerate(parameters):
         layer_name = type(param).__name__
         if layer_name == 'conv':
-            model.add_module(f'{ind} {layer_name}', Conv(*param))
+            model.add_module(f'{ind} {layer_name}',
+                             Conv(*param))
         elif layer_name == 'bneck':
             model.add_module(f'{ind} {layer_name}', BottleNeck(*param))
         elif layer_name == 'pool':
