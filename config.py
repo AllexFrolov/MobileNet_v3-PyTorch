@@ -1,7 +1,5 @@
-from collections import namedtuple
 
 # model parameters
-IM_SIZE = 224
 # head parameters
 # IN_CHANNELS = 1
 # OUT_CHANNELS = 32
@@ -42,50 +40,8 @@ IM_SIZE = 224
 #     Floor(1280, CLASSES, 1, 1)  # 1
 # )
 
+IM_SIZE = 224
 CLASSES = 10
+DROPOUT = 0.2
+ALPHA = 1.
 
-
-BNeck = namedtuple('bneck', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
-Conv = namedtuple('conv', ('in_c', 'out_c', 'k', 'bn', 'se', 'nl', 's'))
-Pool = namedtuple('pool', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
-LARGE_PARAMS = (
-    Conv(1, 16, 3, True, False, 'HS', 2),   # 224
-    BNeck(16, 16, 16, 3, False, 'RE', 1),  # 112
-    BNeck(16, 64, 24, 3, False, 'RE', 2),  # 112
-    BNeck(24, 72, 24, 3, False, 'RE', 1),  # 56
-    BNeck(24, 72, 40, 5, True, 'RE', 2),  # 56
-    BNeck(40, 120, 40, 5, True, 'RE', 1),  # 28
-    BNeck(40, 120, 40, 5, True, 'RE', 1),  # 28
-    BNeck(40, 240, 80, 3, False, 'HS', 2),  # 28
-    BNeck(80, 200, 80, 3, False, 'HS', 1),  # 14
-    BNeck(80, 184, 80, 3, False, 'HS', 1),  # 14
-    BNeck(80, 184, 80, 3, False, 'HS', 1),  # 14
-    BNeck(80, 480, 112, 3, True, 'HS', 1),  # 14
-    BNeck(112, 672, 112, 3, True, 'HS', 1),  # 14
-    BNeck(112, 672, 160, 5, True, 'HS', 2),  # 14
-    BNeck(160, 960, 160, 5, True, 'HS', 1),  # 7
-    BNeck(160, 960, 160, 5, True, 'HS', 1),  # 7
-    Conv(160, 960, 1, True, False, 'HS', 1),  # 7
-    Pool(960, '-', '-', '-', False, '-', 1),  # 7
-    Conv(960, 1280, 1, False, False, 'HS', 1),  # 1
-    Conv(1280, CLASSES, 1, False, False, '-', 1),  # 1
-)
-
-SMALL_PARAMS = (
-    Conv(1, '-', 16, 3, False, 'HS', 2),   # 224
-    BNeck(16, 16, 16, 3, True, 'RE', 2),  # 112
-    BNeck(16, 72, 24, 3, False, 'RE', 2),  # 56
-    BNeck(24, 88, 24, 3, False, 'RE', 1),  # 28
-    BNeck(24, 96, 40, 5, True, 'HS', 2),  # 28
-    BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
-    BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
-    BNeck(40, 120, 48, 5, True, 'HS', 2),  # 14
-    BNeck(48, 144, 48, 5, True, 'HS', 1),  # 14
-    BNeck(48, 288, 96, 5, True, 'HS', 1),  # 14
-    BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
-    BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
-    Conv(96, '-', 576, 1, True, 'HS', 1),  # 7
-    Pool(576, '-', '-', '-', False, '-', 1),  # 7
-    Conv(576, '-', 1024, 1, False, 'HS', 1),  # 1
-    Conv(1024, '-', CLASSES, 1, False, '-', 1),  # 1
-)
