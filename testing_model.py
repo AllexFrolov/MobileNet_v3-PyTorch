@@ -33,7 +33,7 @@ def predict(model, dataloader):
             predicts += torch.argmax(predict_proba, dim=-1).data
             f_names += names
     labels = dataloader.idx_to_class(predicts)
-    result = zip(f_names, labels)
+    result = list(zip(f_names, labels))
     return result
 
 
@@ -46,5 +46,5 @@ if __name__ == '__main__':
     dataset = Dataset(config.DATA_FOLDER, transformer)
     loader = MyDataLoader(dataset, config.BATCH_SIZE)
     model = load_model()
-    predict(model, loader)
+    print(predict(model, loader))
 
