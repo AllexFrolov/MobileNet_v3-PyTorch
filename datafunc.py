@@ -1,6 +1,8 @@
 import pickle
 from pathlib import Path
 
+import random
+from torchvision import datasets
 import numpy as np
 import torch
 from PIL import Image
@@ -103,6 +105,15 @@ def load_class_name(path):
     return out
 
 
+def create_test_dataset(data_folder):
+    dataset = datasets.CIFAR100('data/', False, download=True)
+    Path(data_folder).mkdir()
+    for i in range(100):
+        img, label = random.choice(dataset)
+        img.save(data_folder + str(i) +
+                 '_' + dataset.classes[label]+'.jpg')
+
+
 class Dataset:
     def __init__(self, data_folder, transform):
         """
@@ -113,6 +124,10 @@ class Dataset:
         self.classes = load_class_name('classes_name.pkl')
         data_dir = Path(data_folder)
         self.files = list(data_dir.rglob('*.jpg'))
+        if len(self.files) == 0:
+            create_test_dataset(data_folder)
+            self.files = list(data_dir.rglob('*.jpg'))
+        print(len(self.files))
         self.len_ = len(self.files)
         self.file_names = [path.name for path in self.files]
         self.transform = transform
