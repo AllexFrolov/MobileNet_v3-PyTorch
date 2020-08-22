@@ -9,6 +9,9 @@ DEVICE = torch.device(config.DEVICE)
 
 
 class EMA(nn.Module):
+    """
+    Exponential mean average
+    """
     def __init__(self, mu):
         super(EMA, self).__init__()
         self.mu = mu
@@ -135,6 +138,12 @@ def train(model, train_loader, loss_func, optimizer, epoch_count=10,
 
 
 def accuracy(predict_proba, ground_truth):
+    """
+    Compute accuracy
+    :param predict_proba: (torch.Tensor) prediction probability 2D dim
+    :param ground_truth: (torch.Tensor) ground truth labels
+    :return: (float) accuracy
+    """
     label_index = torch.argmax(predict_proba, dim=-1)
     true_predict = (label_index == ground_truth).sum().item()
     return true_predict / ground_truth.size()[0]
