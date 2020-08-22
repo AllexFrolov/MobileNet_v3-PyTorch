@@ -26,18 +26,17 @@ if __name__ == '__main__':
         transforms.Normalize(*config.NORMALIZE)
     ])
 
-    batch_size = config.BATCH_SIZE
-
-    cifar_train = datasets.CIFAR100('data/', train_transformer, download=True)
+    cifar_train = datasets.CIFAR100('data/',
+                                    transform=train_transformer,
+                                    download=True)
 
     with open('classes_name.pkl', 'wb') as f:
         pickle.dump(cifar_train.classes, f)
 
     train_indices, val_indices = \
         train_test_split(np.arange(len(cifar_train)), .75, cifar_train.targets)
-
-    train_loader = MyDataLoader(cifar_train, batch_size, train_indices, shuffle=True)
-    val_loader = MyDataLoader(cifar_train, batch_size, val_indices, shuffle=True)
+    train_loader = MyDataLoader(cifar_train, config.BATCH_SIZE, train_indices, shuffle=True)
+    val_loader = MyDataLoader(cifar_train, config.BATCH_SIZE, val_indices, shuffle=True)
 
     mobilenet = gm3(config.MODEL_SIZE).to(device)
 
