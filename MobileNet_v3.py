@@ -3,6 +3,7 @@ import torch.nn as nn
 import config
 from collections import namedtuple
 from importlib import reload
+import math
 config = reload(config)
 
 BNeck = namedtuple('bneck', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
@@ -31,23 +32,47 @@ LARGE_PARAMS = (
     Conv(1280, config.CLASSES, 1, False, False, '-', 1),  # 1
 )
 
+# SMALL_PARAMS = (
+#     Conv(3, 16, 3, True, False, 'HS', 2),   # 224
+#     BNeck(16, 16, 16, 3, True, 'RE', 2),  # 112
+#     BNeck(16, 72, 24, 3, False, 'RE', 2),  # 56
+#     BNeck(24, 88, 24, 3, False, 'RE', 1),  # 28
+#     BNeck(24, 96, 40, 5, True, 'HS', 2),  # 28
+#     BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
+#     BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
+#     BNeck(40, 120, 48, 5, True, 'HS', 1),  # 14
+#     BNeck(48, 144, 48, 5, True, 'HS', 1),  # 14
+#     BNeck(48, 288, 96, 5, True, 'HS', 2),  # 14
+#     BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
+#     BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
+#     Conv(96, 576, 1, True, True, 'HS', 1),  # 7
+#     Pool(576, '-', '-', '-', False, '-', 1),  # 7
+#     Conv(576, 1024, 1, True, False, 'HS', 1),  # 1
+#     Conv(1024, config.CLASSES, 1, True, False, '-', 1),  # 1
+# )
+
+
+def correct_depth(depth):
+    return max(config.MIN_DEPTH, int(depth * config.ALPHA))
+
+
 SMALL_PARAMS = (
-    Conv(3, 16, 3, True, False, 'HS', 2),   # 224
-    BNeck(16, 16, 16, 3, True, 'RE', 2),  # 112
-    BNeck(16, 72, 24, 3, False, 'RE', 2),  # 56
-    BNeck(24, 88, 24, 3, False, 'RE', 1),  # 28
-    BNeck(24, 96, 40, 5, True, 'HS', 2),  # 28
-    BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
-    BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
-    BNeck(40, 120, 48, 5, True, 'HS', 2),  # 14
-    BNeck(48, 144, 48, 5, True, 'HS', 1),  # 14
-    BNeck(48, 288, 96, 5, True, 'HS', 1),  # 14
-    BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
-    BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
-    Conv(96, 576, 1, True, True, 'HS', 1),  # 7
-    Pool(576, '-', '-', '-', False, '-', 1),  # 7
-    Conv(576, 1024, 1, True, False, 'HS', 1),  # 1
-    Conv(1024, config.CLASSES, 1, True, False, '-', 1),  # 1
+    Conv(3, correct_depth(16), 3, True, False, 'HS', 2),   # 224
+    BNeck(correct_depth(16), correct_depth(16), correct_depth(16), 3, True, 'RE', 2),  # 112
+    BNeck(correct_depth(16), correct_depth(72), correct_depth(24), 3, False, 'RE', 2),  # 56
+    BNeck(correct_depth(24), correct_depth(88), correct_depth(24), 3, False, 'RE', 1),  # 28
+    BNeck(correct_depth(24), correct_depth(96), correct_depth(40), 5, True, 'HS', 2),  # 28
+    BNeck(correct_depth(40), correct_depth(240), correct_depth(40), 5, True, 'HS', 1),  # 14
+    BNeck(correct_depth(40), correct_depth(240), correct_depth(40), 5, True, 'HS', 1),  # 14
+    BNeck(correct_depth(40), correct_depth(120), correct_depth(48), 5, True, 'HS', 1),  # 14
+    BNeck(correct_depth(48), correct_depth(144), correct_depth(48), 5, True, 'HS', 1),  # 14
+    BNeck(correct_depth(48), correct_depth(288), correct_depth(96), 5, True, 'HS', 2),  # 14
+    BNeck(correct_depth(96), correct_depth(96), correct_depth(96), 5, True, 'HS', 1),  # 7
+    BNeck(correct_depth(96), correct_depth(576), correct_depth(96), 5, True, 'HS', 1),  # 7
+    Conv(correct_depth(96), correct_depth(576), 1, True, True, 'HS', 1),  # 7
+    Pool(correct_depth(576), '-', '-', '-', False, '-', 1),  # 7
+    Conv(correct_depth(576), correct_depth(1024), 1, True, False, 'HS', 1),  # 1
+    Conv(correct_depth(1024), config.CLASSES, 1, True, False, '-', 1),  # 1
 )
 
 
@@ -69,11 +94,12 @@ class BaseLayer(nn.Module):
 class SqueezeAndExcide(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
+        exp_c = math.ceil(in_c / 4)
         self.model = nn.Sequential(
                 nn.AdaptiveAvgPool2d(1),
-                nn.Conv2d(in_c, int(in_c / 4), 1),
+                nn.Conv2d(in_c, exp_c, 1),
                 nn.ReLU(),
-                nn.Conv2d(int(in_c / 4), out_c, 1),
+                nn.Conv2d(exp_c, out_c, 1),
                 nn.Hardswish()
             )
 
@@ -142,7 +168,6 @@ class Conv(BaseLayer):
         super().__init__()
         self.se = se
         self.bn = bn
-
         if self.se:
             self.sae = SqueezeAndExcide(out_c, out_c)
         if self.bn:
@@ -173,8 +198,7 @@ def get_model(size='small'):
     for ind, param in enumerate(parameters):
         layer_name = type(param).__name__
         if layer_name == 'conv':
-            model.add_module(f'{ind} {layer_name}',
-                             Conv(*param))
+            model.add_module(f'{ind} {layer_name}', Conv(*param))
         elif layer_name == 'bneck':
             model.add_module(f'{ind} {layer_name}', BottleNeck(*param))
         elif layer_name == 'pool':
