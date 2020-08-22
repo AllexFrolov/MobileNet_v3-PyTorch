@@ -7,6 +7,13 @@ from PIL import Image
 
 
 def train_test_split(data, train_size, stratify=None):
+    """
+    Split data on two folds
+    :param data: (iterable) data for split
+    :param train_size: (float) should be (0, 1)
+    :param stratify: (labels) stratify folds
+    :return: (tuple(np.array)) train, test
+    """
     if stratify is None:
         indices = np.arange(len(data))
         np.random.shuffle(indices)
@@ -28,6 +35,13 @@ def train_test_split(data, train_size, stratify=None):
 
 class MyDataLoader:
     def __init__(self, data, batch_size, indices=None, shuffle=False):
+        """
+        Create batches
+        :param data: (iterable)
+        :param batch_size: (int)
+        :param indices: (list or np.array) Default None
+        :param shuffle: (bool) Default None
+        """
         self.shuffle = shuffle
         self.batch_size = batch_size
         self.data = data
@@ -43,6 +57,11 @@ class MyDataLoader:
         return self.len_
 
     def idx_to_class(self, indices):
+        """
+        convert indexes to label
+        :param indices: (iterable) 1D array
+        :return: (list) label
+        """
         classes = []
         for index in indices:
             classes.append(self.data.classes[index])
@@ -73,6 +92,11 @@ class MyDataLoader:
 
 
 def load_class_name(path):
+    """
+    load class names from file
+    :param path: (str) file path
+    :return: (list) labels
+    """
     file = open(path, 'rb')
     out = pickle.load(file)
     file.close()
@@ -81,6 +105,11 @@ def load_class_name(path):
 
 class Dataset:
     def __init__(self, data_folder, transform):
+        """
+        Load .jpg files from data folder
+        :param data_folder: (str)
+        :param transform: (torchvision.transforms)
+        """
         self.classes = load_class_name('classes_name.pkl')
         data_dir = Path(data_folder)
         self.files = list(data_dir.rglob('*.jpg'))
