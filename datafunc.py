@@ -1,5 +1,9 @@
+import pickle
+from pathlib import Path
+
 import numpy as np
 import torch
+from PIL import Image
 
 
 def train_test_split(data, train_size, stratify=None):
@@ -38,6 +42,12 @@ class MyDataLoader:
     def __len__(self):
         return self.len_
 
+    def idx_to_class(self, indices):
+        classes = []
+        for index in indices:
+            classes.append(self.data.classes[index])
+        return classes
+
     def create_batch(self, indices):
         X_batch = []
         y_batch = []
@@ -60,3 +70,34 @@ class MyDataLoader:
             batch_indices = self.indices[start_index: end_index]
             X_batch, y_batch = self.create_batch(batch_indices)
             yield X_batch, y_batch
+
+
+def load_class_name(path):
+    file = open(path, 'rb')
+    out = pickle.load(file)
+    file.close()
+    return out
+
+
+class Dataset:
+    def __init__(self, data_folder, transform):
+        self.classes = load_class_name('classes_name.pkl')
+        data_dir = Path(data_folder)
+        self.files = list(data_dir.rglob('*.jpg'))
+        self.len_ = len(self.files)
+        self.file_names = [path.name for path in self.files]
+        self.transform = transform
+
+    def __len__(self):
+        return self.len_
+
+    @staticmethod
+    def load_sample(file):
+        image = Image.open(file)
+        return image
+
+    def __getitem__(self, index):
+        x = self.load_sample(self.files[index])
+        x = self.transform(x)
+        y = self.file_names[index]
+        return x, y
