@@ -2,29 +2,10 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from copy import deepcopy
-import numpy as np
-
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+import config
 
 
-def train_test_split(data, train_size, stratify=None):
-    if stratify is None:
-        indices = np.arange(len(data))
-        np.random.shuffle(indices)
-        split_index = int(len(indices) * train_size)
-        train_indices, test_indices = indices[:split_index], indices[split_index:]
-        return data[train_indices], data[test_indices]
-    else:
-        unique_values = np.unique(stratify)
-        train_data = []
-        test_data = []
-        for u_value in unique_values:
-            u_train, u_test = train_test_split(data[stratify == u_value], train_size)
-            train_data.append(u_train)
-            test_data.append(u_test)
-        np.random.shuffle(train_data)
-        np.random.shuffle(test_data)
-        return np.concatenate(train_data), np.concatenate(test_data)
+DEVICE = torch.device(config.DEVICE)
 
 
 class EMA(nn.Module):
@@ -41,46 +22,6 @@ class EMA(nn.Module):
         new_average = self.mu * x + (1.0 - self.mu) * self.shadow[name]
         self.shadow[name] = new_average.clone()
         return new_average
-
-
-class MyDataLoader:
-    def __init__(self, data, batch_size, indices=None, shuffle=False):
-        self.shuffle = shuffle
-        self.batch_size = batch_size
-        self.data = data
-        if indices is None:
-            self.data_len = len(data)
-            self.indices = np.arange(self.data_len)
-        else:
-            self.data_len = len(indices)
-            self.indices = indices
-        self.len_ = int(np.ceil(self.data_len / batch_size))
-
-    def __len__(self):
-        return self.len_
-
-    def create_batch(self, indices):
-        X_batch = []
-        y_batch = []
-        for index in indices:
-            X, y = self.data[index]
-            X_batch.append(X)
-            y_batch.append(y)
-        if len(X_batch) > 1:
-            X_batch = torch.stack(X_batch)
-        else:
-            X_batch = torch.unsqueeze(X_batch[0], 0)
-        return X_batch, y_batch
-
-    def __iter__(self):
-        if self.shuffle:
-            np.random.shuffle(self.indices)
-        for n_batch in range(self.len_):
-            start_index = n_batch * self.batch_size
-            end_index = min(self.data_len, start_index + self.batch_size)
-            batch_indices = self.indices[start_index: end_index]
-            X_batch, y_batch = self.create_batch(batch_indices)
-            yield X_batch, y_batch
 
 
 def do_epoch(model, optimizer, loss_func, data_loader,
@@ -104,9 +45,10 @@ def do_epoch(model, optimizer, loss_func, data_loader,
     epoch_loss = 0.
     epoch_metric = 0.
     ema = EMA(0.999)
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            ema.register(name, param.data)
+    if mode == 'T':
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                ema.register(name, param.data)
 
     with tqdm(total=len(data_loader)) as progress_bar:
         for ind, (X, y) in enumerate(data_loader, 1):
@@ -114,7 +56,6 @@ def do_epoch(model, optimizer, loss_func, data_loader,
             if title is not None:
                 description += f'{title: 8} |'
             description += f'Mode: {mode} |'
-
             X_tens, y_tens = torch.as_tensor(X, dtype=torch.float, device=DEVICE), \
                              torch.as_tensor(y, dtype=torch.long, device=DEVICE)
             predict = model(X_tens).squeeze(dim=-1)
