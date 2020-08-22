@@ -9,51 +9,34 @@ config = reload(config)
 BNeck = namedtuple('bneck', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
 Conv = namedtuple('conv', ('in_c', 'out_c', 'k', 'bn', 'se', 'nl', 's'))
 Pool = namedtuple('pool', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
-LARGE_PARAMS = (
-    Conv(3, 16, 3, True, False, 'HS', 2),   # 224
-    BNeck(16, 16, 16, 3, False, 'RE', 1),  # 112
-    BNeck(16, 64, 24, 3, False, 'RE', 2),  # 112
-    BNeck(24, 72, 24, 3, False, 'RE', 1),  # 56
-    BNeck(24, 72, 40, 5, True, 'RE', 2),  # 56
-    BNeck(40, 120, 40, 5, True, 'RE', 1),  # 28
-    BNeck(40, 120, 40, 5, True, 'RE', 1),  # 28
-    BNeck(40, 240, 80, 3, False, 'HS', 2),  # 28
-    BNeck(80, 200, 80, 3, False, 'HS', 1),  # 14
-    BNeck(80, 184, 80, 3, False, 'HS', 1),  # 14
-    BNeck(80, 184, 80, 3, False, 'HS', 1),  # 14
-    BNeck(80, 480, 112, 3, True, 'HS', 1),  # 14
-    BNeck(112, 672, 112, 3, True, 'HS', 1),  # 14
-    BNeck(112, 672, 160, 5, True, 'HS', 2),  # 14
-    BNeck(160, 960, 160, 5, True, 'HS', 1),  # 7
-    BNeck(160, 960, 160, 5, True, 'HS', 1),  # 7
-    Conv(160, 960, 1, True, False, 'HS', 1),  # 7
-    Pool(960, '-', '-', '-', False, '-', 1),  # 7
-    Conv(960, 1280, 1, False, False, 'HS', 1),  # 1
-    Conv(1280, config.CLASSES, 1, False, False, '-', 1),  # 1
-)
-
-# SMALL_PARAMS = (
-#     Conv(3, 16, 3, True, False, 'HS', 2),   # 224
-#     BNeck(16, 16, 16, 3, True, 'RE', 2),  # 112
-#     BNeck(16, 72, 24, 3, False, 'RE', 2),  # 56
-#     BNeck(24, 88, 24, 3, False, 'RE', 1),  # 28
-#     BNeck(24, 96, 40, 5, True, 'HS', 2),  # 28
-#     BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
-#     BNeck(40, 240, 40, 5, True, 'HS', 1),  # 14
-#     BNeck(40, 120, 48, 5, True, 'HS', 1),  # 14
-#     BNeck(48, 144, 48, 5, True, 'HS', 1),  # 14
-#     BNeck(48, 288, 96, 5, True, 'HS', 2),  # 14
-#     BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
-#     BNeck(96, 576, 96, 5, True, 'HS', 1),  # 7
-#     Conv(96, 576, 1, True, True, 'HS', 1),  # 7
-#     Pool(576, '-', '-', '-', False, '-', 1),  # 7
-#     Conv(576, 1024, 1, True, False, 'HS', 1),  # 1
-#     Conv(1024, config.CLASSES, 1, True, False, '-', 1),  # 1
-# )
 
 
 def correct_depth(depth):
     return max(config.MIN_DEPTH, int(depth * config.ALPHA))
+
+
+LARGE_PARAMS = (
+    Conv(3, correct_depth(16), 3, True, False, 'HS', 2),   # 224
+    BNeck(correct_depth(16), correct_depth(16), correct_depth(16), 3, False, 'RE', 1),  # 112
+    BNeck(correct_depth(16), correct_depth(64), correct_depth(24), 3, False, 'RE', 2),  # 112
+    BNeck(correct_depth(24), correct_depth(72), correct_depth(24), 3, False, 'RE', 1),  # 56
+    BNeck(correct_depth(24), correct_depth(72), correct_depth(40), 5, True, 'RE', 2),  # 56
+    BNeck(correct_depth(40), correct_depth(120), correct_depth(40), 5, True, 'RE', 1),  # 28
+    BNeck(correct_depth(40), correct_depth(120), correct_depth(40), 5, True, 'RE', 1),  # 28
+    BNeck(correct_depth(40), correct_depth(240), correct_depth(80), 3, False, 'HS', 2),  # 28
+    BNeck(correct_depth(80), correct_depth(200), correct_depth(80), 3, False, 'HS', 1),  # 14
+    BNeck(correct_depth(80), correct_depth(184), correct_depth(80), 3, False, 'HS', 1),  # 14
+    BNeck(correct_depth(80), correct_depth(184), correct_depth(80), 3, False, 'HS', 1),  # 14
+    BNeck(correct_depth(80), correct_depth(480), correct_depth(112), 3, True, 'HS', 1),  # 14
+    BNeck(correct_depth(112), correct_depth(672), correct_depth(112), 3, True, 'HS', 1),  # 14
+    BNeck(correct_depth(112), correct_depth(672), correct_depth(160), 5, True, 'HS', 2),  # 14
+    BNeck(correct_depth(160), correct_depth(960), correct_depth(160), 5, True, 'HS', 1),  # 7
+    BNeck(correct_depth(160), correct_depth(960), correct_depth(160), 5, True, 'HS', 1),  # 7
+    Conv(correct_depth(160), correct_depth(960), 1, True, False, 'HS', 1),  # 7
+    Pool(correct_depth(960), '-', '-', '-', False, '-', 1),  # 7
+    Conv(correct_depth(960), correct_depth(1280), 1, False, False, 'HS', 1),  # 1
+    Conv(correct_depth(1280), config.CLASSES, 1, False, False, '-', 1),  # 1
+)
 
 
 SMALL_PARAMS = (
