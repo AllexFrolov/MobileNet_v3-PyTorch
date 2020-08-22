@@ -46,5 +46,7 @@ if __name__ == '__main__':
     dataset = Dataset(config.DATA_FOLDER, transformer)
     loader = MyDataLoader(dataset, config.BATCH_SIZE)
     model = load_model()
-    print(predict(model, loader))
-
+    prediction = predict(model, loader)
+    with open('predictions.txt', 'w') as f:
+        for values in prediction:
+            f.write(str(values) + '\n')
