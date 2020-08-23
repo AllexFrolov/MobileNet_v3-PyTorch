@@ -11,51 +11,56 @@ Conv = namedtuple('conv', ('in_c', 'out_c', 'k', 'bn', 'se', 'nl', 's'))
 Pool = namedtuple('pool', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
 
 
-def correct_depth(depth):
+def c_d(depth):
+    """
+    Adjust a depth value
+    :param depth: (int) Depth/channels
+    :return: (int) corrected depth
+    """
     return max(config.MIN_DEPTH, int(depth * config.ALPHA))
 
 
 LARGE_PARAMS = (
-    Conv(3, correct_depth(16), 3, True, False, 'HS', 2),   # 224
-    BNeck(correct_depth(16), correct_depth(16), correct_depth(16), 3, False, 'RE', 1),  # 112
-    BNeck(correct_depth(16), correct_depth(64), correct_depth(24), 3, False, 'RE', 2),  # 112
-    BNeck(correct_depth(24), correct_depth(72), correct_depth(24), 3, False, 'RE', 1),  # 56
-    BNeck(correct_depth(24), correct_depth(72), correct_depth(40), 5, True, 'RE', 2),  # 56
-    BNeck(correct_depth(40), correct_depth(120), correct_depth(40), 5, True, 'RE', 1),  # 28
-    BNeck(correct_depth(40), correct_depth(120), correct_depth(40), 5, True, 'RE', 1),  # 28
-    BNeck(correct_depth(40), correct_depth(240), correct_depth(80), 3, False, 'HS', 2),  # 28
-    BNeck(correct_depth(80), correct_depth(200), correct_depth(80), 3, False, 'HS', 1),  # 14
-    BNeck(correct_depth(80), correct_depth(184), correct_depth(80), 3, False, 'HS', 1),  # 14
-    BNeck(correct_depth(80), correct_depth(184), correct_depth(80), 3, False, 'HS', 1),  # 14
-    BNeck(correct_depth(80), correct_depth(480), correct_depth(112), 3, True, 'HS', 1),  # 14
-    BNeck(correct_depth(112), correct_depth(672), correct_depth(112), 3, True, 'HS', 1),  # 14
-    BNeck(correct_depth(112), correct_depth(672), correct_depth(160), 5, True, 'HS', 2),  # 14
-    BNeck(correct_depth(160), correct_depth(960), correct_depth(160), 5, True, 'HS', 1),  # 7
-    BNeck(correct_depth(160), correct_depth(960), correct_depth(160), 5, True, 'HS', 1),  # 7
-    Conv(correct_depth(160), correct_depth(960), 1, True, False, 'HS', 1),  # 7
-    Pool(correct_depth(960), '-', '-', '-', False, '-', 1),  # 7
-    Conv(correct_depth(960), correct_depth(1280), 1, False, False, 'HS', 1),  # 1
-    Conv(correct_depth(1280), config.CLASSES, 1, False, False, '-', 1),  # 1
+    Conv(3, c_d(16), 3, True, False, 'HS', 2),  # 224
+    BNeck(c_d(16), c_d(16), c_d(16), 3, False, 'RE', 1),  # 112
+    BNeck(c_d(16), c_d(64), c_d(24), 3, False, 'RE', 2),  # 112
+    BNeck(c_d(24), c_d(72), c_d(24), 3, False, 'RE', 1),  # 56
+    BNeck(c_d(24), c_d(72), c_d(40), 5, True, 'RE', 2),  # 56
+    BNeck(c_d(40), c_d(120), c_d(40), 5, True, 'RE', 1),  # 28
+    BNeck(c_d(40), c_d(120), c_d(40), 5, True, 'RE', 1),  # 28
+    BNeck(c_d(40), c_d(240), c_d(80), 3, False, 'HS', 2),  # 28
+    BNeck(c_d(80), c_d(200), c_d(80), 3, False, 'HS', 1),  # 14
+    BNeck(c_d(80), c_d(184), c_d(80), 3, False, 'HS', 1),  # 14
+    BNeck(c_d(80), c_d(184), c_d(80), 3, False, 'HS', 1),  # 14
+    BNeck(c_d(80), c_d(480), c_d(112), 3, True, 'HS', 1),  # 14
+    BNeck(c_d(112), c_d(672), c_d(112), 3, True, 'HS', 1),  # 14
+    BNeck(c_d(112), c_d(672), c_d(160), 5, True, 'HS', 2),  # 14
+    BNeck(c_d(160), c_d(960), c_d(160), 5, True, 'HS', 1),  # 7
+    BNeck(c_d(160), c_d(960), c_d(160), 5, True, 'HS', 1),  # 7
+    Conv(c_d(160), c_d(960), 1, True, False, 'HS', 1),  # 7
+    Pool(c_d(960), '-', '-', '-', False, '-', 1),  # 7
+    Conv(c_d(960), c_d(1280), 1, False, False, 'HS', 1),  # 1
+    Conv(c_d(1280), config.CLASSES, 1, False, False, '-', 1),  # 1
 )
 
 
 SMALL_PARAMS = (
-    Conv(3, correct_depth(16), 3, True, False, 'HS', 2),   # 224
-    BNeck(correct_depth(16), correct_depth(16), correct_depth(16), 3, True, 'RE', 2),  # 112
-    BNeck(correct_depth(16), correct_depth(72), correct_depth(24), 3, False, 'RE', 2),  # 56
-    BNeck(correct_depth(24), correct_depth(88), correct_depth(24), 3, False, 'RE', 1),  # 28
-    BNeck(correct_depth(24), correct_depth(96), correct_depth(40), 5, True, 'HS', 2),  # 28
-    BNeck(correct_depth(40), correct_depth(240), correct_depth(40), 5, True, 'HS', 1),  # 14
-    BNeck(correct_depth(40), correct_depth(240), correct_depth(40), 5, True, 'HS', 1),  # 14
-    BNeck(correct_depth(40), correct_depth(120), correct_depth(48), 5, True, 'HS', 1),  # 14
-    BNeck(correct_depth(48), correct_depth(144), correct_depth(48), 5, True, 'HS', 1),  # 14
-    BNeck(correct_depth(48), correct_depth(288), correct_depth(96), 5, True, 'HS', 2),  # 14
-    BNeck(correct_depth(96), correct_depth(96), correct_depth(96), 5, True, 'HS', 1),  # 7
-    BNeck(correct_depth(96), correct_depth(576), correct_depth(96), 5, True, 'HS', 1),  # 7
-    Conv(correct_depth(96), correct_depth(576), 1, True, True, 'HS', 1),  # 7
-    Pool(correct_depth(576), '-', '-', '-', False, '-', 1),  # 7
-    Conv(correct_depth(576), correct_depth(1024), 1, True, False, 'HS', 1),  # 1
-    Conv(correct_depth(1024), config.CLASSES, 1, True, False, '-', 1),  # 1
+    Conv(3, c_d(16), 3, True, False, 'HS', 2),  # 224
+    BNeck(c_d(16), c_d(16), c_d(16), 3, True, 'RE', 2),  # 112
+    BNeck(c_d(16), c_d(72), c_d(24), 3, False, 'RE', 2),  # 56
+    BNeck(c_d(24), c_d(88), c_d(24), 3, False, 'RE', 1),  # 28
+    BNeck(c_d(24), c_d(96), c_d(40), 5, True, 'HS', 2),  # 28
+    BNeck(c_d(40), c_d(240), c_d(40), 5, True, 'HS', 1),  # 14
+    BNeck(c_d(40), c_d(240), c_d(40), 5, True, 'HS', 1),  # 14
+    BNeck(c_d(40), c_d(120), c_d(48), 5, True, 'HS', 1),  # 14
+    BNeck(c_d(48), c_d(144), c_d(48), 5, True, 'HS', 1),  # 14
+    BNeck(c_d(48), c_d(288), c_d(96), 5, True, 'HS', 2),  # 14
+    BNeck(c_d(96), c_d(96), c_d(96), 5, True, 'HS', 1),  # 7
+    BNeck(c_d(96), c_d(576), c_d(96), 5, True, 'HS', 1),  # 7
+    Conv(c_d(96), c_d(576), 1, True, True, 'HS', 1),  # 7
+    Pool(c_d(576), '-', '-', '-', False, '-', 1),  # 7
+    Conv(c_d(576), c_d(1024), 1, True, False, 'HS', 1),  # 1
+    Conv(c_d(1024), config.CLASSES, 1, True, False, '-', 1),  # 1
 )
 
 
