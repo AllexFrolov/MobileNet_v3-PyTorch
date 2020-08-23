@@ -1,11 +1,11 @@
 import pickle
+import random
 from pathlib import Path
 
-import random
-from torchvision import datasets
 import numpy as np
 import torch
 from PIL import Image
+from torchvision import datasets
 
 
 def train_test_split(data, train_size, stratify=None):
@@ -106,12 +106,17 @@ def load_class_name(path):
 
 
 def create_test_dataset(data_folder):
+    """
+    Loads a CIFAR-100 test dataset and selects
+    100 random images, then saves them as .jpg files
+    :param data_folder: folder to save images
+    """
     dataset = datasets.CIFAR100('data/', False, download=True)
     Path(data_folder).mkdir()
     for i in range(100):
         img, label = random.choice(dataset)
         img.save(data_folder + str(i) +
-                 '_' + dataset.classes[label]+'.jpg')
+                 '_' + dataset.classes[label] + '.jpg')
 
 
 class Dataset:
