@@ -74,7 +74,7 @@ class BaseLayer(nn.Module):
         return (kernel_size - 1) // 2
 
 
-class SqueezeAndExcide(nn.Module):
+class SqueezeAndExcite(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
         exp_c = math.ceil(in_c / 4)
@@ -117,7 +117,7 @@ class DepthWiseSepConv(nn.Module):
         self.se = se
         # add squeeze and excite
         if self.se:
-            self.sae = SqueezeAndExcide(in_c, in_c)
+            self.sae = SqueezeAndExcite(in_c, in_c)
         self.depth_wise_conv = DepthWiseConv(in_c, s, k, nl)
         self.point_wise = nn.Conv2d(in_c, out_c, 1)
 
@@ -152,7 +152,7 @@ class Conv(BaseLayer):
         self.se = se
         self.bn = bn
         if self.se:
-            self.sae = SqueezeAndExcide(out_c, out_c)
+            self.sae = SqueezeAndExcite(out_c, out_c)
         if self.bn:
             self.normalization = nn.BatchNorm2d(out_c, momentum=config.BN_MOMENTUM)
 
