@@ -92,7 +92,7 @@ class SqueezeAndExcite(nn.Module):
             )
 
     def forward(self, inputs):
-        return self.model(inputs)
+        return torch.mul(inputs, self.model(inputs))
 
 
 class DepthWiseConv(BaseLayer):
@@ -104,7 +104,6 @@ class DepthWiseConv(BaseLayer):
                 [nn.Conv2d(1, 1, k_size, stride, self.same_padding(k_size))
                  for _ in range(channels)]
             )
-
         self.non_linear = self.choice_nl(nl)
         self.normalization = nn.BatchNorm2d(channels, momentum=config.BN_MOMENTUM)
         self.dropout = nn.Dropout(config.DROPOUT)
@@ -129,7 +128,7 @@ class DepthWiseSepConv(nn.Module):
     def forward(self, inputs):
         out = self.depth_wise_conv(inputs)
         if self.se:
-            out *= self.sae(out)
+            out = self.sae(out)
         out = self.point_wise(out)
 
         return out
@@ -167,7 +166,7 @@ class Conv(BaseLayer):
     def forward(self, inputs):
         out = self.conv(inputs)
         if self.se:
-            out *= self.sae(out)
+            out = self.sae(out)
         if self.bn:
             out = self.normalization(out)
         if self.non_linear is not None:
