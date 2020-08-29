@@ -99,20 +99,18 @@ class DepthWiseConv(BaseLayer):
     def __init__(self, channels, stride, k_size, nl):
         super().__init__()
 
-        self.depth_wise = \
-            nn.ModuleList(
-                [nn.Conv2d(1, 1, k_size, stride, self.same_padding(k_size))
-                 for _ in range(channels)]
-            )
+        self.depth_wise = nn.Conv2d(channels, channels,  
+                                    stride,
+                                    self.same_padding(k_size),
+                                    groups=channels)
+
         self.non_linear = self.choice_nl(nl)
         self.normalization = nn.BatchNorm2d(channels, momentum=config.BN_MOMENTUM)
         self.dropout = nn.Dropout(config.DROPOUT)
 
     def forward(self, inputs):
-        out = []
-        for channel, layer in enumerate(self.depth_wise):
-            out.append(self.dropout(layer(inputs[:, [channel]])))
-        return self.non_linear(self.normalization(torch.cat(out, dim=1)))
+        out = self.dropout(self.depth_wise(inputs))
+        return self.non_linear(self.normalization(out))
 
 
 class DepthWiseSepConv(nn.Module):
