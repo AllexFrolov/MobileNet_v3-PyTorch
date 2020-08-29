@@ -99,7 +99,9 @@ class DepthWiseConv(BaseLayer):
     def __init__(self, channels, stride, k_size, nl):
         super().__init__()
 
-        self.depth_wise = nn.Conv2d(channels, channels,  
+        self.depth_wise = nn.Conv2d(channels,
+                                    channels,
+                                    k_size,
                                     stride,
                                     self.same_padding(k_size),
                                     groups=channels)
