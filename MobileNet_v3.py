@@ -151,7 +151,7 @@ class BottleNeck(BaseLayer):
     def forward(self, inputs):
         out = self.non_linear(self.normalization_bn(self.conv(inputs)))
         out = self.depth_wise_sep(out)
-        out = out + inputs if inputs.size == out.size else out
+        out = out + inputs if inputs.size() == out.size() else out
         return self.normalization_out(out)
 
 
