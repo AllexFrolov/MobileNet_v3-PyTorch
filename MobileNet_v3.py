@@ -101,7 +101,7 @@ class SqueezeAndExcite(nn.Module):
 
 
 class DepthWiseConv(BaseLayer):
-    def __init__(self, channels, stride, k_size, nl, dropout):
+    def __init__(self, channels, stride, k_size, nl):
         super().__init__()
 
         self.depth_wise = nn.Conv2d(channels,
@@ -113,21 +113,20 @@ class DepthWiseConv(BaseLayer):
 
         self.non_linear = self.choice_nl(nl)
         self.normalization = nn.BatchNorm2d(channels)
-        self.dropout = nn.Dropout(dropout)
 
     def forward(self, inputs):
-        out = self.dropout(self.depth_wise(inputs))
+        out = self.depth_wise(inputs)
         return self.non_linear(self.normalization(out))
 
 
 class DepthWiseSepConv(nn.Module):
-    def __init__(self, in_c, out_c, s, k, nl, se, dropout):
+    def __init__(self, in_c, out_c, s, k, nl, se):
         super().__init__()
         self.se = se
         # add squeeze and excite
         if self.se:
             self.sae = SqueezeAndExcite(in_c, in_c)
-        self.depth_wise_conv = DepthWiseConv(in_c, s, k, nl, dropout)
+        self.depth_wise_conv = DepthWiseConv(in_c, s, k, nl)
         self.point_wise = nn.Conv2d(in_c, out_c, 1)
 
     def forward(self, inputs):
@@ -140,11 +139,11 @@ class DepthWiseSepConv(nn.Module):
 
 
 class BottleNeck(BaseLayer):
-    def __init__(self, in_c, exp_c, out_c, k, se, nl, s, dropout):
+    def __init__(self, in_c, exp_c, out_c, k, se, nl, s):
         super().__init__()
         self.non_linear = self.choice_nl(nl)
         self.conv = nn.Conv2d(in_c, exp_c, 1)
-        self.depth_wise_sep = DepthWiseSepConv(exp_c, out_c, s, k, nl, se, dropout)
+        self.depth_wise_sep = DepthWiseSepConv(exp_c, out_c, s, k, nl, se)
         self.normalization_bn = nn.BatchNorm2d(exp_c)
         self.normalization_out = nn.BatchNorm2d(out_c)
 
@@ -183,14 +182,16 @@ def get_model(classes, size='small', alpha=1., dropout=0.8, min_depth=3):
     correct_depth = CorrectDepth(alpha,  min_depth)
     parameters = get_model_params(size, classes, correct_depth)
     model = nn.Sequential()
-    for ind, param in enumerate(parameters):
+    for ind, param in enumerate(parameters[:-1]):
         layer_name = type(param).__name__
         if layer_name == 'conv':
             model.add_module(f'{ind} {layer_name}', Convolution(*param))
         elif layer_name == 'bneck':
-            model.add_module(f'{ind} {layer_name}', BottleNeck(*param, dropout))
+            model.add_module(f'{ind} {layer_name}', BottleNeck(*param))
         elif layer_name == 'pool':
             model.add_module(layer_name, nn.AdaptiveAvgPool2d(1))
+
+    model.add_module('Dropout', nn.Dropout(dropout))
+    model.add_module('Classifier', Convolution(*parameters[-1]))
     model.add_module('Flatten', nn.Flatten())
-    model.add_module('LogSoftMax', nn.LogSoftmax(dim=1))
     return model
