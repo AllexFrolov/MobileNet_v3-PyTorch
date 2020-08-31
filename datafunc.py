@@ -52,8 +52,10 @@ class MyDataLoader:
             self.indices = np.arange(self.data_len)
         else:
             self.data_len = len(indices)
-            self.indices = indices
+            self.indices = np.array(indices)
         self.len_ = int(np.ceil(self.data_len / batch_size))
+
+        self.X_shape = tuple(self.data[0][0].shape)
 
     def __len__(self):
         return self.len_
@@ -70,16 +72,13 @@ class MyDataLoader:
         return classes
 
     def create_batch(self, indices):
-        X_batch = []
-        y_batch = []
-        for index in indices:
+        batch_size = len(indices)
+        X_batch = torch.zeros((batch_size, *self.X_shape))
+        y_batch = torch.zeros(batch_size)
+        for n_batch, index in enumerate(indices):
             X, y = self.data[index]
-            X_batch.append(X)
-            y_batch.append(y)
-        if len(X_batch) > 1:
-            X_batch = torch.stack(X_batch)
-        else:
-            X_batch = torch.unsqueeze(X_batch[0], 0)
+            X_batch[n_batch] = X
+            y_batch[n_batch] = y
         return X_batch, y_batch
 
     def __iter__(self):
