@@ -1,13 +1,16 @@
 import pickle
+from importlib import reload
+
 import numpy as np
 import torch
-from torchvision import datasets, transforms
 import torch.nn as nn
-from importlib import reload
+from torchvision import datasets, transforms
+
 import MobileNet_v3
-import functions
-import datafunc
 import config
+import datafunc
+import functions
+
 config = reload(config)
 MobileNet_v3 = reload(MobileNet_v3)
 functions = reload(functions)

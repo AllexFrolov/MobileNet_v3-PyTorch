@@ -1,7 +1,8 @@
 import torch
+from torchvision import transforms
+
 import config
 from MobileNet_v3 import get_model
-from torchvision import transforms
 from datafunc import Dataset, MyDataLoader
 
 

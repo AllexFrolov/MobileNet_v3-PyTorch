@@ -1,9 +1,10 @@
+from copy import deepcopy
+
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-from copy import deepcopy
-import config
 
+import config
 
 DEVICE = torch.device(config.DEVICE)
 
