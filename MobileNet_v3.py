@@ -93,7 +93,7 @@ class SqueezeAndExcite(nn.Module):
                 nn.Conv2d(in_c, exp_c, 1),
                 nn.ReLU(),
                 nn.Conv2d(exp_c, out_c, 1),
-                nn.Hardswish()
+                nn.Hardsigmoid()
             )
 
     def forward(self, inputs):
