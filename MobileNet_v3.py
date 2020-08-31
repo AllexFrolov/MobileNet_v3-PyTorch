@@ -46,7 +46,7 @@ def get_model_params(size, classes, c_d):
             Conv(c_d(960), c_d(1280), 1, False, False, 'HS', 1),  # 1
             Conv(c_d(1280), classes, 1, False, False, '-', 1),  # 1
         )
-    else:
+    elif size == 'small':
         return (
             Conv(3, c_d(16), 3, True, False, 'HS', 2),  # 224
             BNeck(c_d(16), c_d(16), c_d(16), 3, True, 'RE', 2),  # 112
@@ -65,6 +65,8 @@ def get_model_params(size, classes, c_d):
             Conv(c_d(576), c_d(1024), 1, True, False, 'HS', 1),  # 1
             Conv(c_d(1024), classes, 1, True, False, '-', 1),  # 1
         )
+    else:
+        raise ValueError('size must be "large" or "small"')
 
 
 class BaseLayer(nn.Module):
@@ -91,7 +93,7 @@ class SqueezeAndExcite(nn.Module):
                 nn.Conv2d(in_c, exp_c, 1),
                 nn.ReLU(),
                 nn.Conv2d(exp_c, out_c, 1),
-                nn.Hardswish()
+                nn.Hardsigmoid()
             )
 
     def forward(self, inputs):
@@ -149,7 +151,7 @@ class BottleNeck(BaseLayer):
     def forward(self, inputs):
         out = self.non_linear(self.normalization_bn(self.conv(inputs)))
         out = self.depth_wise_sep(out)
-        out = out + inputs if inputs.size == out.size else out
+        out = out + inputs if inputs.size() == out.size() else out
         return self.normalization_out(out)
 
 
