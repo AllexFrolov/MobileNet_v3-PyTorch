@@ -23,7 +23,7 @@ def get_model_params(size, classes, c_d):
     Conv = namedtuple('conv', ('in_c', 'out_c', 'k', 'bn', 'se', 'nl', 's'))
     Pool = namedtuple('pool', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
 
-    if size == 'small':
+    if size == 'large':
         return (
             Conv(3, c_d(16), 3, True, False, 'HS', 2),  # 224
             BNeck(c_d(16), c_d(16), c_d(16), 3, False, 'RE', 1),  # 112
