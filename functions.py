@@ -48,6 +48,7 @@ def do_epoch(model, optimizer, loss_func, data_loader,
     # History
     epoch_loss = 0.
     epoch_metric = 0.
+
     ema = EMA(0.999)
     if mode == 'T':
         for name, param in model.named_parameters():
@@ -58,7 +59,7 @@ def do_epoch(model, optimizer, loss_func, data_loader,
         for ind, (X, y) in enumerate(data_loader, 1):
             description = ''
             if title is not None:
-                description += f'{title: 8} |'
+                description += title
             description += f'Mode: {mode} |'
             X_tens, y_tens = torch.as_tensor(X, dtype=torch.float, device=DEVICE), \
                              torch.as_tensor(y, dtype=torch.long, device=DEVICE)
@@ -117,11 +118,12 @@ def train(model, train_loader, loss_func, optimizer, epoch_count=10,
 
     for epoch in range(epoch_count):
         for mode, data in datasets.items():
-
+            # title for progress bar
+            title = f'[{epoch+1: 3}/{epoch_count}]|'
             model.train(mode == 'T')
             epoch_loss, epoch_metric = \
                 do_epoch(model, optimizer, loss_func, data,
-                         mode, metric)
+                         mode, metric, title)
             history_info[mode + 'loss'].append(epoch_loss)
             history_info[mode + 'metric'].append(epoch_metric)
 
