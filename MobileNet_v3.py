@@ -1,8 +1,8 @@
 import math
 from collections import namedtuple
 
-import torch
 import torch.nn as nn
+from torch import Tensor
 
 
 class CorrectDepth:
@@ -107,8 +107,8 @@ class SqueezeAndExcite(nn.Module):
             nn.Hardsigmoid()
         )
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        return torch.mul(inputs, self.sequential(inputs))
+    def forward(self, inputs: Tensor) -> Tensor:
+        return inputs * self.sequential(inputs)
 
 
 class DepthWiseConv(BaseLayer):
@@ -126,7 +126,7 @@ class DepthWiseConv(BaseLayer):
         self.non_linear = self.choice_nl(non_linear)
         self.normalization = nn.BatchNorm2d(channels)
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+    def forward(self, inputs: Tensor) -> Tensor:
         out = self.depth_wise(inputs)
         return self.non_linear(self.normalization(out))
 
@@ -144,7 +144,7 @@ class DepthWiseSepConv(nn.Module):
         self.depth_wise_conv = DepthWiseConv(in_channels, kernel_size, non_linear, stride)
         self.point_wise = nn.Conv2d(in_channels, out_channels, 1)
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+    def forward(self, inputs: Tensor) -> Tensor:
         out = self.depth_wise_conv(inputs)
         if self.sae is not None:
             out = self.sae(out)
@@ -166,7 +166,7 @@ class BottleNeck(BaseLayer):
         self.normalization_bn = nn.BatchNorm2d(exp_channels)
         self.normalization_out = nn.BatchNorm2d(out_channels)
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+    def forward(self, inputs: Tensor) -> Tensor:
         out = self.expansion_layer(inputs)
         out = self.normalization_bn(out)
         out = self.non_linear(out)
@@ -194,7 +194,7 @@ class Convolution(BaseLayer):
                               stride, self.same_padding(kernel_size))
         self.non_linear = self.choice_nl(non_linear)
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+    def forward(self, inputs: Tensor) -> Tensor:
         out = self.conv(inputs)
         if self.sae is not None:
             out = self.sae(out)
