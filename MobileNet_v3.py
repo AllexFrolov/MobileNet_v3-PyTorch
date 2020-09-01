@@ -205,6 +205,21 @@ class Convolution(BaseLayer):
         return out
 
 
+def weight_initialization(model):
+    """
+    Initialization model weight
+    :param model: (nn.Module) model
+    """
+    for module in model.modules():
+        if isinstance(module, nn.Conv2d):
+            nn.init.kaiming_normal_(module.weight, mode='fan_out')
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.BatchNorm2d):
+            nn.init.ones_(module.weight)
+            nn.init.zeros_(module.bias)
+
+
 def get_model(classes, size='small', alpha=1., dropout=0.8, min_depth=3):
     correct_depth = CorrectDepth(alpha, min_depth)
     parameters = get_model_params(size, classes, correct_depth)
@@ -221,4 +236,5 @@ def get_model(classes, size='small', alpha=1., dropout=0.8, min_depth=3):
     model.add_module('Dropout', nn.Dropout(dropout))
     model.add_module('Classifier', Convolution(*parameters[-1]))
     model.add_module('Flatten', nn.Flatten())
+    weight_initialization(model)
     return model
