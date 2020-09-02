@@ -4,9 +4,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-import config
-
-DEVICE = torch.device(config.DEVICE)
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class EMA(nn.Module):
