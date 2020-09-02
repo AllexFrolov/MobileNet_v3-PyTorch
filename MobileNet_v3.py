@@ -220,9 +220,19 @@ def weight_initialization(model):
             nn.init.zeros_(module.bias)
 
 
-def get_model(classes, size='small', alpha=1., dropout=0.8, min_depth=3):
+def get_model(classifier_output_dim: int, architecture_size: str = 'small',
+              alpha: float = 1., dropout: float = 0.8, min_depth: int = 3) -> nn.Module:
+    """
+    Creates MobileNet_v3 with the specified parameters
+    :param classifier_output_dim: (int) classes count
+    :param architecture_size: (str) should be "large" or "small". Default: "small"
+    :param alpha: (float) coefficient of reduce depth size. Default: 1.
+    :param dropout: (float) probability of an element to be zeroed. Default: 0.8
+    :param min_depth: (int) max(min_depth, layer_depth * alpha). Default: 3
+    :return: (nn.Module) MobileNet_v3 model
+    """
     correct_depth = CorrectDepth(alpha, min_depth)
-    parameters = get_model_params(size, classes, correct_depth)
+    parameters = get_model_params(architecture_size, classifier_output_dim, correct_depth)
     model = nn.Sequential()
     for ind, param in enumerate(parameters[:-1]):
         layer_name = type(param).__name__
