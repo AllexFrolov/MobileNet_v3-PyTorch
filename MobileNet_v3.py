@@ -1,8 +1,8 @@
 import math
-from collections import namedtuple
+from typing import Optional
 
 import torch.nn as nn
-from torch import Tensor
+from torch import Tensor, save, load
 
 
 class CorrectDepth:
@@ -17,64 +17,6 @@ class CorrectDepth:
             :return: (int) corrected depth
         """
         return max(self.min_depth, int(depth * self.alpha))
-
-
-def get_model_params(architecture: str, classifier_output: int, c_d: CorrectDepth) -> tuple:
-    """
-    Return corrected architecture parameters
-    :param architecture: (str) Architecture should be "large" or "small"
-    :param classifier_output: output from classifier layer
-    :param c_d: (CorrectDepth) Depth corrector
-    :return: (tuple of namedtuple) corrected architecture parameters
-    """
-    BNeck = namedtuple('bneck', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
-    Conv = namedtuple('conv', ('in_c', 'out_c', 'k', 'bn', 'se', 'nl', 's'))
-    Pool = namedtuple('pool', ('in_c', 'exp_c', 'out_c', 'k', 'se', 'nl', 's'))
-
-    if architecture == 'large':
-        return (
-            Conv(3, c_d(16), 3, True, False, 'HS', 2),  # 224
-            BNeck(c_d(16), c_d(16), c_d(16), 3, False, 'RE', 1),  # 112
-            BNeck(c_d(16), c_d(64), c_d(24), 3, False, 'RE', 2),  # 112
-            BNeck(c_d(24), c_d(72), c_d(24), 3, False, 'RE', 1),  # 56
-            BNeck(c_d(24), c_d(72), c_d(40), 5, True, 'RE', 2),  # 56
-            BNeck(c_d(40), c_d(120), c_d(40), 5, True, 'RE', 1),  # 28
-            BNeck(c_d(40), c_d(120), c_d(40), 5, True, 'RE', 1),  # 28
-            BNeck(c_d(40), c_d(240), c_d(80), 3, False, 'HS', 2),  # 28
-            BNeck(c_d(80), c_d(200), c_d(80), 3, False, 'HS', 1),  # 14
-            BNeck(c_d(80), c_d(184), c_d(80), 3, False, 'HS', 1),  # 14
-            BNeck(c_d(80), c_d(184), c_d(80), 3, False, 'HS', 1),  # 14
-            BNeck(c_d(80), c_d(480), c_d(112), 3, True, 'HS', 1),  # 14
-            BNeck(c_d(112), c_d(672), c_d(112), 3, True, 'HS', 1),  # 14
-            BNeck(c_d(112), c_d(672), c_d(160), 5, True, 'HS', 2),  # 14
-            BNeck(c_d(160), c_d(960), c_d(160), 5, True, 'HS', 1),  # 7
-            BNeck(c_d(160), c_d(960), c_d(160), 5, True, 'HS', 1),  # 7
-            Conv(c_d(160), c_d(960), 1, True, False, 'HS', 1),  # 7
-            Pool(c_d(960), '-', '-', '-', False, None, 1),  # 7
-            Conv(c_d(960), c_d(1280), 1, False, False, 'HS', 1),  # 1
-            Conv(c_d(1280), classifier_output, 1, False, False, None, 1),  # 1
-        )
-    elif architecture == 'small':
-        return (
-            Conv(3, c_d(16), 3, True, False, 'HS', 2),  # 224
-            BNeck(c_d(16), c_d(16), c_d(16), 3, True, 'RE', 2),  # 112
-            BNeck(c_d(16), c_d(72), c_d(24), 3, False, 'RE', 2),  # 56
-            BNeck(c_d(24), c_d(88), c_d(24), 3, False, 'RE', 1),  # 28
-            BNeck(c_d(24), c_d(96), c_d(40), 5, True, 'HS', 2),  # 28
-            BNeck(c_d(40), c_d(240), c_d(40), 5, True, 'HS', 1),  # 14
-            BNeck(c_d(40), c_d(240), c_d(40), 5, True, 'HS', 1),  # 14
-            BNeck(c_d(40), c_d(120), c_d(48), 5, True, 'HS', 1),  # 14
-            BNeck(c_d(48), c_d(144), c_d(48), 5, True, 'HS', 1),  # 14
-            BNeck(c_d(48), c_d(288), c_d(96), 5, True, 'HS', 2),  # 14
-            BNeck(c_d(96), c_d(96), c_d(96), 5, True, 'HS', 1),  # 7
-            BNeck(c_d(96), c_d(576), c_d(96), 5, True, 'HS', 1),  # 7
-            Conv(c_d(96), c_d(576), 1, True, True, 'HS', 1),  # 7
-            Pool(c_d(576), '-', '-', '-', False, None, 1),  # 7
-            Conv(c_d(576), c_d(1024), 1, True, False, 'HS', 1),  # 1
-            Conv(c_d(1024), classifier_output, 1, True, False, None, 1),  # 1
-        )
-    else:
-        raise ValueError('size must be "large" or "small"')
 
 
 class BaseLayer(nn.Module):
@@ -205,46 +147,163 @@ class Convolution(BaseLayer):
         return out
 
 
-def weight_initialization(model):
-    """
-    Initialization model weight
-    :param model: (nn.Module) model
-    """
-    for module in model.modules():
-        if isinstance(module, nn.Conv2d):
-            nn.init.kaiming_normal_(module.weight, mode='fan_out')
-            if module.bias is not None:
+class MobileNetV3(nn.Module):
+    def __init__(self, labels: Optional[list] = None):
+        super().__init__()
+        self.labels = labels
+        self.sequential = None
+        self.architecture = None
+
+    def save_labels(self, labels: Optional[list]):
+        self.labels = labels
+
+    def choice_model_architecture(
+            self, architecture: str, in_channels: int, out_channels: int,
+            alpha: float, min_depth: int, dropout: float):
+        """
+        Return default architecture with users input and output channels
+        :param architecture: (str) Architecture should be "large" or "small"
+        :param in_channels: (int) input channels in model
+        :param out_channels: (int) output channels from model. Classes count
+        :param alpha: (float) coefficient of reduce depth size
+        :param min_depth: (int) max(min_depth, layer_depth * alpha)
+        :param dropout: (float) probability of an element to be zeroed
+
+        BottleNeck: ['bneck', in_ch, exp_ch, out_ch,
+                        k_size, sq_exc, non_linear, stride]
+        Convolution: ['conv', in_ch, out_ch, k_size,
+                        batchnorm, sq_ext, non_linear, stride]
+        Pool: ['pool', out_size]
+        Dropout: ['dropout', p]
+        """
+        if type(in_channels) is not int or in_channels < 1:
+            raise ValueError('in_channels should be type int and >= 1')
+        if type(out_channels) is not int or out_channels < 1:
+            raise ValueError('out_channels should be type int and >= 1')
+        c_d = CorrectDepth(alpha, min_depth)
+        if architecture == 'large':
+            self.architecture = (
+                # 'conv', in_ch, out_ch, k_size, batchnorm, sq_ext, non_linear, stride
+                ['conv', in_channels, c_d(16), 3, True, False, 'HS', 2],  # 224
+                # 'bneck', in_ch, exp_ch, out_ch, k_size, sq_exc, non_linear, stride
+                ['bneck', c_d(16), c_d(16), c_d(16), 3, False, 'RE', 1],  # 112
+                ['bneck', c_d(16), c_d(64), c_d(24), 3, False, 'RE', 2],  # 112
+                ['bneck', c_d(24), c_d(72), c_d(24), 3, False, 'RE', 1],  # 56
+                ['bneck', c_d(24), c_d(72), c_d(40), 5, True, 'RE', 2],  # 56
+                ['bneck', c_d(40), c_d(120), c_d(40), 5, True, 'RE', 1],  # 28
+                ['bneck', c_d(40), c_d(120), c_d(40), 5, True, 'RE', 1],  # 28
+                ['bneck', c_d(40), c_d(240), c_d(80), 3, False, 'HS', 2],  # 28
+                ['bneck', c_d(80), c_d(200), c_d(80), 3, False, 'HS', 1],  # 14
+                ['bneck', c_d(80), c_d(184), c_d(80), 3, False, 'HS', 1],  # 14
+                ['bneck', c_d(80), c_d(184), c_d(80), 3, False, 'HS', 1],  # 14
+                ['bneck', c_d(80), c_d(480), c_d(112), 3, True, 'HS', 1],  # 14
+                ['bneck', c_d(112), c_d(672), c_d(112), 3, True, 'HS', 1],  # 14
+                ['bneck', c_d(112), c_d(672), c_d(160), 5, True, 'HS', 2],  # 14
+                ['bneck', c_d(160), c_d(960), c_d(160), 5, True, 'HS', 1],  # 7
+                ['bneck', c_d(160), c_d(960), c_d(160), 5, True, 'HS', 1],  # 7
+                ['conv', c_d(160), c_d(960), 1, True, False, 'HS', 1],  # 7
+                # 'pool', out_size
+                ['pool', 1],  # 7
+                ['conv', c_d(960), c_d(1280), 1, False, False, 'HS', 1],  # 1
+                # 'dropout', p
+                ['dropout', dropout],  # 1
+                ['conv', c_d(1280), out_channels, 1, False, False, None, 1],  # 1
+            )
+        elif architecture == 'small':
+            self.architecture = (
+                # 'conv', in_ch, out_ch, k_size, batchnorm, sq_ext, non_linear, stride
+                ['conv', in_channels, c_d(16), 3, True, False, 'HS', 2],  # 224
+                # 'bneck', in_ch, exp_ch, out_ch, k_size, sq_exc, non_linear, stride
+                ['bneck', c_d(16), c_d(16), c_d(16), 3, True, 'RE', 2],  # 112
+                ['bneck', c_d(16), c_d(72), c_d(24), 3, False, 'RE', 2],  # 56
+                ['bneck', c_d(24), c_d(88), c_d(24), 3, False, 'RE', 1],  # 28
+                ['bneck', c_d(24), c_d(96), c_d(40), 5, True, 'HS', 2],  # 28
+                ['bneck', c_d(40), c_d(240), c_d(40), 5, True, 'HS', 1],  # 14
+                ['bneck', c_d(40), c_d(240), c_d(40), 5, True, 'HS', 1],  # 14
+                ['bneck', c_d(40), c_d(120), c_d(48), 5, True, 'HS', 1],  # 14
+                ['bneck', c_d(48), c_d(144), c_d(48), 5, True, 'HS', 1],  # 14
+                ['bneck', c_d(48), c_d(288), c_d(96), 5, True, 'HS', 2],  # 14
+                ['bneck', c_d(96), c_d(96), c_d(96), 5, True, 'HS', 1],  # 7
+                ['bneck', c_d(96), c_d(576), c_d(96), 5, True, 'HS', 1],  # 7
+                ['conv', c_d(96), c_d(576), 1, True, True, 'HS', 1],  # 7
+                # 'pool', out_size
+                ['pool', 1],  # 7
+                ['conv', c_d(576), c_d(1024), 1, True, False, 'HS', 1],  # 1
+                # 'dropout', p
+                ['dropout', dropout],  # 1
+                ['conv', c_d(1024), out_channels, 1, True, False, None, 1],  # 1
+            )
+        else:
+            raise ValueError('size must be "large" or "small"')
+
+    def weight_initialization(self):
+        """
+        Initialization model weight
+        """
+        for module in self.sequential.modules():
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_out')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.BatchNorm2d):
+                nn.init.ones_(module.weight)
                 nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.BatchNorm2d):
-            nn.init.ones_(module.weight)
-            nn.init.zeros_(module.bias)
 
+    def create_model(self,
+                     classes_count: int,
+                     in_channels: int = 3,
+                     architecture: str = 'large',
+                     alpha: float = 1.,
+                     min_depth: int = 3,
+                     dropout: float = 0.8
+                     ):
+        """
+        Creates model with the specified parameters
+        :param classes_count: (int or None) classes_count. ignored if architecture not is None
+        :param in_channels: (int) input channels in model. Default: 3
+        :param architecture: (str) Architecture should be "large" or "small"
+        :param alpha: (float) coefficient of reduce depth size. Default: 1.
+        :param min_depth: (int) max(min_depth, layer_depth * alpha). Default: 3
+        :param dropout: (float) probability of an element to be zeroed. Default: 0.8
+        """
+        self.choice_model_architecture(architecture, in_channels, classes_count,
+                                       alpha, min_depth, dropout)
+        self._constructor()
 
-def get_model(classifier_output_dim: int, architecture_size: str = 'small',
-              alpha: float = 1., dropout: float = 0.8, min_depth: int = 3) -> nn.Module:
-    """
-    Creates MobileNet_v3 with the specified parameters
-    :param classifier_output_dim: (int) classes count
-    :param architecture_size: (str) should be "large" or "small". Default: "small"
-    :param alpha: (float) coefficient of reduce depth size. Default: 1.
-    :param dropout: (float) probability of an element to be zeroed. Default: 0.8
-    :param min_depth: (int) max(min_depth, layer_depth * alpha). Default: 3
-    :return: (nn.Module) MobileNet_v3 model
-    """
-    correct_depth = CorrectDepth(alpha, min_depth)
-    parameters = get_model_params(architecture_size, classifier_output_dim, correct_depth)
-    model = nn.Sequential()
-    for ind, param in enumerate(parameters[:-1]):
-        layer_name = type(param).__name__
-        if layer_name == 'conv':
-            model.add_module(f'{ind} {layer_name}', Convolution(*param))
-        elif layer_name == 'bneck':
-            model.add_module(f'{ind} {layer_name}', BottleNeck(*param))
-        elif layer_name == 'pool':
-            model.add_module(layer_name, nn.AdaptiveAvgPool2d(1))
+    def _constructor(self):
+        """
+        Assembles the model
+        """
+        self.sequential = nn.Sequential()
+        for ind, param in enumerate(self.architecture):
+            layer_name = param[0]
+            if layer_name == 'conv':
+                self.sequential.add_module(f'{ind} {layer_name}', Convolution(*param[1:]))
+            elif layer_name == 'bneck':
+                self.sequential.add_module(f'{ind} {layer_name}', BottleNeck(*param[1:]))
+            elif layer_name == 'pool':
+                self.sequential.add_module(f'{ind} {layer_name}', nn.AdaptiveAvgPool2d(*param[1:]))
+            elif layer_name == 'dropout':
+                self.sequential.add_module(f'{ind} {layer_name}', nn.Dropout(*param[1:]))
+        self.sequential.add_module('Flatten', nn.Flatten())
+        self.weight_initialization()
 
-    model.add_module('Dropout', nn.Dropout(dropout))
-    model.add_module('Classifier', Convolution(*parameters[-1]))
-    model.add_module('Flatten', nn.Flatten())
-    weight_initialization(model)
-    return model
+    def save_model(self, file_name: str = 'model.pkl'):
+        """
+        save weights values and architecture in a binary file
+        :param file_name: full name of a file. Default: "model.pkl"
+        """
+        save({'architecture': self.architecture,
+              'state_dict': self.sequential.state_dict(),
+              'labels': self.labels
+              }, file_name)
+
+    def load_model(self, file_name: str = 'model.pkl'):
+        file = load(file_name)
+        self.architecture = file['architecture']
+        self._constructor()
+        self.sequential.load_state_dict(file['state_dict'])
+        self.labels = file['labels']
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        return self.sequential(inputs)
